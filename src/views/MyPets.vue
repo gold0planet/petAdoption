@@ -65,10 +65,21 @@
                   </div>
                 </div>
               </div>
-              <button @click="viewHealthRecords(pet)" 
-                class="mt-3 w-full py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                查看完整档案
-              </button>
+              <div class="mt-3 flex space-x-2">
+                <button @click="viewHealthRecords(pet)" 
+                  class="flex-1 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                  查看完整档案
+                </button>
+                <button @click="reportLostPet(pet)"
+                  :class="[
+                    'flex-1 py-2 text-sm rounded-lg transition-colors',
+                    pet.isLost 
+                      ? 'bg-orange-100 text-orange-600' 
+                      : 'text-orange-600 hover:bg-orange-50'
+                  ]">
+                  {{ pet.isLost ? '已挂失' : '发布挂失' }}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -154,6 +165,234 @@
           </form>
         </div>
       </div>
+
+      <!-- 健康记录表单模态框 -->
+      <div v-if="showHealthRecordModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style="z-index: 60;">
+        <div class="bg-white rounded-lg w-full max-w-md p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold">添加健康记录</h3>
+            <button @click="closeHealthRecordModal" class="text-gray-500 hover:text-gray-700">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          
+          <form @submit.prevent="saveHealthRecord" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">记录类型</label>
+              <select v-model="healthRecordForm.type" required
+                class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                <option value="体检">体检</option>
+                <option value="疫苗">疫苗</option>
+                <option value="驱虫">驱虫</option>
+                <option value="治疗">治疗</option>
+                <option value="手术">手术</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">日期</label>
+              <input type="date" v-model="healthRecordForm.date" required
+                class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">标题</label>
+              <input type="text" v-model="healthRecordForm.title" required
+                class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="例如：年度体检、疫苗注射等">
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">详细描述</label>
+              <textarea v-model="healthRecordForm.description" rows="4" required
+                class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="请详细描述健康记录的具体情况..."></textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">医疗机构</label>
+              <input type="text" v-model="healthRecordForm.hospital"
+                class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="请输入就医的宠物医院名称">
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">费用（元）</label>
+              <input type="number" v-model="healthRecordForm.cost"
+                class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="请输入本次医疗费用">
+            </div>
+
+            <div class="flex justify-end space-x-3 mt-6">
+              <button type="button" @click="closeHealthRecordModal"
+                class="px-4 py-2 border rounded-lg hover:bg-gray-50">
+                取消
+              </button>
+              <button type="submit"
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                保存记录
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- 完整健康档案模态框 -->
+      <div v-if="showFullRecordsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg w-full max-w-4xl p-6 max-h-[90vh] overflow-y-auto">
+          <div class="flex justify-between items-center mb-6">
+            <div>
+              <h3 class="text-xl font-bold">{{ selectedPet?.name }} 的健康档案</h3>
+              <p class="text-gray-600 mt-1">完整的健康记录和医疗历史</p>
+            </div>
+            <button @click="closeFullRecordsModal" class="text-gray-500 hover:text-gray-700">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+
+          <div class="flex justify-between items-center mb-4">
+            <div class="flex space-x-4">
+              <select v-model="recordFilter.type" 
+                class="px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                <option value="">全部类型</option>
+                <option value="体检">体检</option>
+                <option value="疫苗">疫苗</option>
+                <option value="驱虫">驱虫</option>
+                <option value="治疗">治疗</option>
+                <option value="手术">手术</option>
+              </select>
+              <select v-model="recordFilter.year"
+                class="px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                <option value="">全部年份</option>
+                <option v-for="year in availableYears" :key="year" :value="year">
+                  {{ year }}年
+                </option>
+              </select>
+            </div>
+            <button @click="addHealthRecord(selectedPet)"
+              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              添加记录
+            </button>
+          </div>
+
+          <!-- 时间轴展示 -->
+          <div class="space-y-6">
+            <div v-for="record in filteredHealthRecords" :key="record.id" 
+              class="flex items-start space-x-4 pb-6 border-l-2 border-blue-200 pl-4 relative">
+              <div class="absolute -left-2 top-0 w-4 h-4 rounded-full bg-blue-500"></div>
+              <div class="flex-1 bg-gray-50 rounded-lg p-4">
+                <div class="flex justify-between items-start mb-2">
+                  <div>
+                    <span class="inline-block px-2 py-1 text-sm rounded-full"
+                      :class="{
+                        'bg-blue-100 text-blue-600': record.type === '体检',
+                        'bg-green-100 text-green-600': record.type === '疫苗',
+                        'bg-yellow-100 text-yellow-600': record.type === '驱虫',
+                        'bg-red-100 text-red-600': record.type === '治疗',
+                        'bg-purple-100 text-purple-600': record.type === '手术'
+                      }">
+                      {{ record.type }}
+                    </span>
+                    <h4 class="font-medium mt-2">{{ record.title }}</h4>
+                  </div>
+                  <span class="text-sm text-gray-500">{{ record.date }}</span>
+                </div>
+                <p class="text-gray-600 text-sm mb-2">{{ record.description }}</p>
+                <div class="flex justify-between text-sm text-gray-500">
+                  <span>医疗机构：{{ record.hospital }}</span>
+                  <span>费用：¥{{ record.cost }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 添加挂失表单模态框 -->
+      <div v-if="showLostPetModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg w-full max-w-md p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold">发布挂失信息</h3>
+            <button @click="closeLostPetModal" class="text-gray-500 hover:text-gray-700">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          
+          <form @submit.prevent="saveLostPetReport" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">丢失时间</label>
+              <input type="datetime-local" v-model="lostPetForm.lostTime" required
+                class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">丢失地点</label>
+              <input type="text" v-model="lostPetForm.location" required
+                class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="请尽可能详细描述丢失地点">
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">详细描述</label>
+              <textarea v-model="lostPetForm.description" rows="4" required
+                class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="请描述丢失时的具体情况、宠物特征等..."></textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">联系方式</label>
+              <input type="tel" v-model="lostPetForm.contact" required
+                class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="请留下您的联系电话">
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">悬赏金额（可选）</label>
+              <input type="number" v-model="lostPetForm.reward"
+                class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="如有悬赏,请填写金额">
+            </div>
+
+            <div class="flex justify-end space-x-3 mt-6">
+              <button type="button" @click="closeLostPetModal"
+                class="px-4 py-2 border rounded-lg hover:bg-gray-50">
+                取消
+              </button>
+              <button type="submit"
+                class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700">
+                发布挂失
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- 取消挂失确认模态框 -->
+      <div v-if="showCancelLostModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg w-full max-w-md p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold">取消挂失确认</h3>
+            <button @click="showCancelLostModal = false" class="text-gray-500 hover:text-gray-700">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          
+          <div class="py-4">
+            <p class="text-gray-600">确定要取消该宠物的挂失状态吗？取消后将不再显示挂失信息。</p>
+          </div>
+
+          <div class="flex justify-end space-x-3 mt-6">
+            <button @click="showCancelLostModal = false"
+              class="px-4 py-2 border rounded-lg hover:bg-gray-50">
+              再想想
+            </button>
+            <button @click="confirmCancelLost"
+              class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700">
+              确认取消
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -217,7 +456,57 @@ export default {
             }
           ]
         }
-      ]
+      ],
+      showHealthRecordModal: false,
+      showFullRecordsModal: false,
+      selectedPet: null,
+      healthRecordForm: {
+        type: '体检',
+        date: '',
+        title: '',
+        description: '',
+        hospital: '',
+        cost: ''
+      },
+      recordFilter: {
+        type: '',
+        year: ''
+      },
+      showLostPetModal: false,
+      lostPetForm: {
+        lostTime: '',
+        location: '',
+        description: '',
+        contact: '',
+        reward: ''
+      },
+      showCancelLostModal: false,
+      petToCancel: null
+    }
+  },
+  computed: {
+    availableYears() {
+      if (!this.selectedPet) return []
+      const years = this.selectedPet.healthRecords.map(record => 
+        new Date(record.date).getFullYear()
+      )
+      return [...new Set(years)].sort((a, b) => b - a)
+    },
+    filteredHealthRecords() {
+      if (!this.selectedPet) return []
+      let records = [...this.selectedPet.healthRecords]
+      
+      if (this.recordFilter.type) {
+        records = records.filter(record => record.type === this.recordFilter.type)
+      }
+      
+      if (this.recordFilter.year) {
+        records = records.filter(record => 
+          new Date(record.date).getFullYear() === parseInt(this.recordFilter.year)
+        )
+      }
+      
+      return records.sort((a, b) => new Date(b.date) - new Date(a.date))
     }
   },
   methods: {
@@ -232,8 +521,12 @@ export default {
       }
     },
     viewHealthRecords(pet) {
-      // TODO: 跳转到宠物健康档案详情页
-      console.log('查看健康档案:', pet.name)
+      this.selectedPet = pet
+      this.showFullRecordsModal = true
+      this.recordFilter = {
+        type: '',
+        year: ''
+      }
     },
     closeModal() {
       this.showAddPetModal = false
@@ -262,6 +555,99 @@ export default {
         this.pets.push(newPet)
       }
       this.closeModal()
+    },
+    addHealthRecord(pet) {
+      this.selectedPet = pet
+      this.showHealthRecordModal = true
+      this.healthRecordForm = {
+        type: '体检',
+        date: new Date().toISOString().split('T')[0],
+        title: '',
+        description: '',
+        hospital: '',
+        cost: ''
+      }
+    },
+    closeHealthRecordModal() {
+      this.showHealthRecordModal = false
+      this.healthRecordForm = {
+        type: '体检',
+        date: '',
+        title: '',
+        description: '',
+        hospital: '',
+        cost: ''
+      }
+    },
+    saveHealthRecord() {
+      const newRecord = {
+        id: Date.now(),
+        ...this.healthRecordForm
+      }
+      
+      const petIndex = this.pets.findIndex(p => p.id === this.selectedPet.id)
+      if (petIndex !== -1) {
+        if (!this.pets[petIndex].healthRecords) {
+          this.pets[petIndex].healthRecords = []
+        }
+        this.pets[petIndex].healthRecords.unshift(newRecord)
+      }
+      
+      this.closeHealthRecordModal()
+    },
+    closeFullRecordsModal() {
+      this.showFullRecordsModal = false
+      this.selectedPet = null
+      this.recordFilter = {
+        type: '',
+        year: ''
+      }
+    },
+    reportLostPet(pet) {
+      if (pet.isLost) {
+        this.petToCancel = pet;
+        this.showCancelLostModal = true;
+      } else {
+        this.selectedPet = pet;
+        this.showLostPetModal = true;
+        this.lostPetForm = {
+          lostTime: new Date().toISOString().slice(0, 16),
+          location: '',
+          description: '',
+          contact: '',
+          reward: ''
+        };
+      }
+    },
+    closeLostPetModal() {
+      this.showLostPetModal = false
+      this.lostPetForm = {
+        lostTime: '',
+        location: '',
+        description: '',
+        contact: '',
+        reward: ''
+      }
+    },
+    saveLostPetReport() {
+      const petIndex = this.pets.findIndex(p => p.id === this.selectedPet.id)
+      if (petIndex !== -1) {
+        this.pets[petIndex].isLost = true
+        this.pets[petIndex].lostInfo = {
+          ...this.lostPetForm,
+          reportTime: new Date().toISOString()
+        }
+      }
+      this.closeLostPetModal()
+    },
+    confirmCancelLost() {
+      const index = this.pets.findIndex(p => p.id === this.petToCancel.id);
+      if (index !== -1) {
+        this.pets[index].isLost = false;
+        this.pets[index].lostInfo = null;
+      }
+      this.showCancelLostModal = false;
+      this.petToCancel = null;
     }
   }
 }
@@ -287,11 +673,44 @@ export default {
 /* 模态框动画 */
 .modal-enter-active,
 .modal-leave-active {
-  transition: opacity 0.3s ease;
+  transition: all 0.3s ease;
 }
 
 .modal-enter-from,
 .modal-leave-to {
   opacity: 0;
+  transform: scale(0.9);
+}
+
+/* 时间轴样式 */
+.border-l-2 {
+  position: relative;
+}
+
+.border-l-2::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background-color: #e5e7eb;
+}
+
+/* 挂失状态样式 */
+.pet-card.lost {
+  border: 2px solid #f97316;
+}
+
+.pet-card.lost::before {
+  content: '已挂失';
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: #f97316;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
 }
 </style> 
