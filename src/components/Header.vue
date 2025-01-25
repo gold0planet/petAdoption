@@ -71,7 +71,12 @@
         </li>
         <li v-else class="relative">
           <div @click="toggleDropdown" class="flex items-center cursor-pointer">
-            <img :src="userInfo.avatar" alt="用户头像" class="w-8 h-8 rounded-full object-cover" />
+            <div v-if="userInfo.avatar === 'default'" 
+              class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold"
+              :style="{ backgroundColor: generateAvatarColor(userInfo.username) }">
+              {{ getAvatarText(userInfo.username) }}
+            </div>
+            <img v-else :src="userInfo.avatar" alt="用户头像" class="w-8 h-8 rounded-full object-cover" />
             <span class="ml-2">{{ userInfo.username }}</span>
           </div>
           <div v-show="showDropdown" class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2">
@@ -105,7 +110,7 @@ export default {
       showNotifications: false,
       userInfo: {
         username: '张小明',
-        avatar: 'https://placekitten.com/100/100'
+        avatar: 'default'
       },
       unreadCount: 3,
       notifications: [
@@ -167,6 +172,24 @@ export default {
     },
     updateUnreadCount() {
       this.unreadCount = this.notifications.filter(n => !n.isRead).length
+    },
+    getAvatarText(username) {
+      if (!username) return '';
+      // 如果用户名是英文，返回首字母大写
+      if (/^[a-zA-Z]/.test(username)) {
+        return username.charAt(0).toUpperCase();
+      }
+      // 如果是中文，返回第一个字
+      return username.charAt(0);
+    },
+    generateAvatarColor(username) {
+      // 根据用户名生成固定的颜色
+      let hash = 0;
+      for (let i = 0; i < username.length; i++) {
+        hash = username.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const hue = hash % 360;
+      return `hsl(${hue}, 70%, 50%)`;
     }
   },
   mounted() {
