@@ -26,7 +26,7 @@
       <!-- 领养信息展示 -->
       <div class="animal-list mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div v-for="animal in filteredAnimals" :key="animal.id" class="animal-card bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 text-center">
-          <img :src="animal.image" alt="animal.name" class="w-full h-48 object-cover rounded-md mb-4">
+          <img :src="getPetImageUrl(animal.image)" alt="animal.name" class="w-full h-48 object-cover rounded-md mb-4">
           <h3 class="text-xl font-bold mb-2">{{ animal.name }}</h3>
           <div class="flex flex-col items-center mb-4">
             <div class="flex justify-between w-full max-w-sm">
@@ -112,9 +112,11 @@
 </template>
 
 <script>
+import { mapGetters } from 'vuex';
 import Banner from '@/components/Banner.vue';
 import Footer from '@/components/Footer.vue';
 import gaodeData from '../../public/gaode.json';
+import petsApi from '@/api/pets';
 
 export default {
   components: {
@@ -205,6 +207,9 @@ export default {
     };
   },
   computed: {
+    ...mapGetters('pets', [
+      'getPetImageUrl'
+    ]),
     totalPages() {
       return Math.ceil(this.animals.length / this.itemsPerPage);
     },
@@ -224,9 +229,20 @@ export default {
     }
   },
   methods: {
+    checkLoginAndExecute(action) {
+      // 检查是否登录，未登录则提示
+      if (!this.$route.meta.isLoggedIn) {
+        this.$message.warning('请先登录后再进行操作')
+        return false
+      }
+      return action()
+    },
+    
     openClueForm(animal) {
-      this.selectedAnimal = animal;
-      this.showForm = true;
+      this.checkLoginAndExecute(() => {
+        this.selectedAnimal = animal;
+        this.showForm = true;
+      })
     },
     closeClueForm() {
       this.showForm = false;

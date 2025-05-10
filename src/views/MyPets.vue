@@ -17,13 +17,13 @@
         <div v-for="pet in pets" :key="pet.id" class="bg-white rounded-lg shadow-sm overflow-hidden">
           <!-- 宠物卡片头部 -->
           <div class="relative">
-            <img :src="pet.image" :alt="pet.name" class="w-full h-48 object-cover">
+            <img :src="getPetImageUrl(pet.image)" :alt="pet.name" class="w-full h-48 object-cover">
             <div class="absolute top-3 right-3 flex space-x-2">
               <button @click="editPet(pet)" class="p-2 bg-white rounded-full shadow-md hover:bg-gray-100">
-                <i class="fas fa-edit text-gray-600"></i>
+                <i class="fas fa-edit text-blue-500"></i>
               </button>
-              <button @click="deletePet(pet)" class="p-2 bg-white rounded-full shadow-md hover:bg-gray-100">
-                <i class="fas fa-trash-alt text-red-600"></i>
+              <button @click="deletePet(pet.id)" class="p-2 bg-white rounded-full shadow-md hover:bg-gray-100">
+                <i class="fas fa-trash text-red-500"></i>
               </button>
             </div>
           </div>
@@ -106,7 +106,7 @@
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">宠物照片</label>
               <div class="flex items-center space-x-4">
-                <img :src="petForm.image || 'https://via.placeholder.com/100'" 
+                <img :src="getPetImageUrl(petForm.image) || 'https://via.placeholder.com/100'" 
                   class="w-20 h-20 rounded-lg object-cover">
                 <button type="button" class="px-4 py-2 border rounded-lg hover:bg-gray-50">
                   上传照片
@@ -398,12 +398,16 @@
 </template>
 
 <script>
+import { mapGetters } from 'vuex';
 import Banner from '@/components/Banner.vue'
+import Footer from '@/components/Footer.vue'
+import petsApi from '@/api/pets';
 
 export default {
   name: 'MyPets',
   components: {
-    Banner
+    Banner,
+    Footer
   },
   data() {
     return {
@@ -485,6 +489,9 @@ export default {
     }
   },
   computed: {
+    ...mapGetters('pets', [
+      'getPetImageUrl'
+    ]),
     availableYears() {
       if (!this.selectedPet) return []
       const years = this.selectedPet.healthRecords.map(record => 

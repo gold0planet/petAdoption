@@ -216,12 +216,23 @@ export default {
     }
   },
   methods: {
+    checkLoginAndExecute(action) {
+      // 检查是否登录，未登录则提示
+      if (!this.$route.meta.isLoggedIn) {
+        this.$message.warning('请先登录后再进行操作')
+        return false
+      }
+      return action()
+    },
+    
     selectCategory(category) {
       this.selectedCategory = this.selectedCategory === category.name ? '' : category.name;
       this.currentPage = 1; // 重置页码
     },
     readMore(article) {
-      console.log('查看文章详情:', article.title);
+      this.checkLoginAndExecute(() => {
+        console.log('查看文章详情:', article.title);
+      })
     }
   },
   watch: {

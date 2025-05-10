@@ -76,7 +76,15 @@
               :style="{ backgroundColor: generateAvatarColor(userInfo.username) }">
               {{ getAvatarText(userInfo.username) }}
             </div>
-            <img v-else :src="userInfo.avatar" alt="用户头像" class="w-8 h-8 rounded-full object-cover" />
+            <img v-else-if="userInfo.avatar" 
+                 :src="userInfo.avatar" 
+                 alt="用户头像" 
+                 class="w-8 h-8 rounded-full object-cover" />
+            <div v-else
+                 class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold"
+                 :style="{ backgroundColor: generateAvatarColor(userInfo.username) }">
+              {{ getAvatarText(userInfo.username) }}
+            </div>
             <span class="ml-2">{{ userInfo.username }}</span>
           </div>
           <div v-show="showDropdown" class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2">
@@ -105,13 +113,8 @@ export default {
   name: 'Header',
   data() {
     return {
-      isLoggedIn: true,
       showDropdown: false,
       showNotifications: false,
-      userInfo: {
-        username: '张小明',
-        avatar: 'default'
-      },
       unreadCount: 3,
       notifications: [
         {
@@ -141,6 +144,23 @@ export default {
       ]
     }
   },
+  computed: {
+    isLoggedIn() {
+      return this.$store.getters.isLoggedIn
+    },
+    userInfo() {
+      const info = this.$store.getters.userInfo || {
+        userId: null,
+        userName: '未登录',
+        avatar: null
+      }
+      return {
+        userId: info.userId,
+        username: info.userName || '未登录',
+        avatar: info.avatar || 'default'
+      }
+    }
+  },
   methods: {
     toggleDropdown() {
       this.showDropdown = !this.showDropdown
@@ -155,8 +175,17 @@ export default {
       }
     },
     handleLogout() {
-      this.isLoggedIn = false
-      this.$router.push('/login')
+      this.$store.dispatch('logout').then(result => {
+        if (result.success) {
+          this.$message.success('已成功退出')
+          this.$router.push('/login')
+        } else {
+          this.$message.error(result.message)
+        }
+      }).catch(error => {
+        console.error('退出登录异常:', error)
+        this.$message.error('退出登录失败，请重试')
+      })
     },
     readNotification(notification) {
       notification.isRead = true
@@ -185,6 +214,7 @@ export default {
     generateAvatarColor(username) {
       // 根据用户名生成固定的颜色
       let hash = 0;
+      username = username || '未登录';
       for (let i = 0; i < username.length; i++) {
         hash = username.charCodeAt(i) + ((hash << 5) - hash);
       }

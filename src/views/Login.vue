@@ -194,79 +194,231 @@
   </template>
   
   <script>
+  import { mapActions } from 'vuex'
+  import CryptoJS from 'crypto-js'
+
   export default {
-  name: 'Login',
+    name: 'Login',
     data() {
       return {
-      activeTab: 'login',
-      loginType: 'phone',
-      countdown: 0,
-      registerCountdown: 0,
-      loginForm: {
-        phone: '',
-        code: '',
-        username: '',
-        password: '',
-        remember: false
-      },
-      registerForm: {
-        phone: '',
-        code: '',
-        password: '',
-        confirmPassword: '',
-        agreement: false
+        activeTab: 'login',
+        loginType: 'phone',
+        countdown: 0,
+        registerCountdown: 0,
+        loginForm: {
+          phone: '',
+          code: '',
+          username: '',
+          password: '',
+          remember: false
+        },
+        registerForm: {
+          phone: '',
+          code: '',
+          password: '',
+          confirmPassword: '',
+          agreement: false
+        },
+        phoneError: '',
+        loading: false
       }
-    }
     },
     methods: {
-    // 发送登录验证码
-    sendCode() {
-      if (this.countdown > 0) return;
-      // TODO: 调用发送验证码接口
-      this.countdown = 60;
-      const timer = setInterval(() => {
-        this.countdown--;
-        if (this.countdown === 0) {
-          clearInterval(timer);
+      ...mapActions(['login', 'register', 'sendVerificationCode']),
+
+      // 加密密码
+      encryptPassword(password) {
+        return CryptoJS.MD5(password).toString()
+      },
+
+      // 验证手机号格式
+      validatePhone(phone) {
+        const phoneRegex = /^1[3-9]\d{9}$/
+        const value = phone.trim()
+        
+        if (!value) {
+          return { valid: false, message: '手机号不能为空' }
+        } else if (value.length !== 11) {
+          return { valid: false, message: '手机号必须是11位' }
+        } else if (!/^1[3-9]/.test(value)) {
+          return { valid: false, message: '手机号必须以1开头，第二位为3-9' }
+        } else if (!/^\d+$/.test(value)) {
+          return { valid: false, message: '手机号只能包含数字' }
+        } else if (!phoneRegex.test(value)) {
+          return { valid: false, message: '请输入正确的手机号格式' }
         }
-      }, 1000);
-    },
+        return { valid: true }
+      },
 
-    // 发送注册验证码
-    sendRegisterCode() {
-      if (this.registerCountdown > 0) return;
-      // TODO: 调用发送验证码接口
-      this.registerCountdown = 60;
-      const timer = setInterval(() => {
-        this.registerCountdown--;
-        if (this.registerCountdown === 0) {
-          clearInterval(timer);
+      // 发送登录验证码
+      async sendCode() {
+        if (this.countdown > 0) return
+        
+        const phoneValidation = this.validatePhone(this.loginForm.phone)
+        if (!phoneValidation.valid) {
+          this.$message.error(phoneValidation.message)
+          return
         }
-      }, 1000);
-    },
 
-    // 处理登录
-    handleLogin() {
-      if (this.loginType === 'phone') {
-        // 手机号登录逻辑
-        console.log('手机号登录', this.loginForm);
-      } else {
-        // 密码登录逻辑
-        console.log('密码登录', this.loginForm);
-      }
-    },
+        try {
+          const result = await this.sendVerificationCode({
+            phone: this.loginForm.phone,
+            type: 'login'
+          })
 
-    // 处理注册
-    handleRegister() {
-      if (!this.registerForm.agreement) {
-        alert('请先同意用户协议和隐私政策');
-        return;
-      }
-      if (this.registerForm.password !== this.registerForm.confirmPassword) {
-        alert('两次输入的密码不一致');
-        return;
-      }
-      console.log('注册', this.registerForm);
+          if (result.success) {
+            this.$message.success('验证码已发送')
+            this.countdown = 60
+            const timer = setInterval(() => {
+              this.countdown--
+              if (this.countdown === 0) {
+                clearInterval(timer)
+              }
+            }, 1000)
+          } else {
+            this.$message.error(result.message)
+          }
+        } catch (error) {
+          this.$message.error('发送验证码失败，请稍后重试')
+        }
+      },
+
+      // 发送注册验证码
+      async sendRegisterCode() {
+        if (this.registerCountdown > 0) return
+        
+        const phoneValidation = this.validatePhone(this.registerForm.phone)
+        if (!phoneValidation.valid) {
+          this.$message.error(phoneValidation.message)
+          return
+        }
+
+        try {
+          const result = await this.sendVerificationCode({
+            phone: this.registerForm.phone,
+            type: 'register'
+          })
+
+          if (result.success) {
+            this.$message.success('验证码已发送')
+            this.registerCountdown = 60
+            const timer = setInterval(() => {
+              this.registerCountdown--
+              if (this.registerCountdown === 0) {
+                clearInterval(timer)
+              }
+            }, 1000)
+          } else {
+            this.$message.error(result.message)
+          }
+        } catch (error) {
+          this.$message.error('发送验证码失败，请稍后重试')
+        }
+      },
+
+      // 处理登录
+      async handleLogin() {
+        if (this.loading) return
+        
+        // 验证手机号
+        const phoneValidation = this.validatePhone(
+          this.loginType === 'phone' ? this.loginForm.phone : this.loginForm.username
+        )
+        if (!phoneValidation.valid) {
+          this.$message.error(phoneValidation.message)
+          return
+        }
+
+        this.loading = true
+        try {
+          const loginData = {
+            loginType: this.loginType,
+            phone: this.loginType === 'phone' ? this.loginForm.phone : this.loginForm.username
+          }
+
+          if (this.loginType === 'phone') {
+            if (!this.loginForm.code) {
+              this.$message.error('请输入验证码')
+              return
+            }
+            loginData.code = this.loginForm.code
+          } else {
+            if (!this.loginForm.password) {
+              this.$message.error('请输入密码')
+              return
+            }
+            loginData.password = this.encryptPassword(this.loginForm.password)
+          }
+
+          const result = await this.login(loginData)
+          if (result.success) {
+            this.$message.success('登录成功')
+            this.$router.push('/adoption')
+          } else {
+            this.$message.error(result.message || '登录失败')
+          }
+        } catch (error) {
+          this.$message.error('登录失败，请稍后重试')
+        } finally {
+          this.loading = false
+        }
+      },
+
+      // 处理注册
+      async handleRegister() {
+        if (this.loading) return
+        
+        // 验证手机号
+        const phoneValidation = this.validatePhone(this.registerForm.phone)
+        if (!phoneValidation.valid) {
+          this.$message.error(phoneValidation.message)
+          return
+        }
+
+        // 验证其他字段
+        if (!this.registerForm.agreement) {
+          this.$message.warning('请先同意用户协议和隐私政策')
+          return
+        }
+        if (!this.registerForm.code) {
+          this.$message.error('请输入验证码')
+          return
+        }
+        if (!this.registerForm.password) {
+          this.$message.error('请输入密码')
+          return
+        }
+
+        // 调试：输出密码和确认密码的详细信息
+        console.log('密码:', this.registerForm.password)
+        console.log('确认密码:', this.registerForm.confirmPassword)
+        console.log('密码是否相等:', this.registerForm.password === this.registerForm.confirmPassword)
+
+        if (this.registerForm.password !== this.registerForm.confirmPassword) {
+          this.$message.error('两次输入的密码不一致')
+          return
+        }
+
+        this.loading = true
+        try {
+          const result = await this.register({
+            phone: this.registerForm.phone,
+            password: this.encryptPassword(this.registerForm.password),
+            code: this.registerForm.code
+          })
+
+          if (result.success) {
+            this.$message.success('注册成功')
+            this.activeTab = 'login'
+            this.loginForm.phone = this.registerForm.phone
+          } else {
+            this.$message.error(result.message || '注册失败')
+          }
+        } catch (error) {
+          this.$message.error('注册失败，请稍后重试')
+        } finally {
+          this.loading = false
+        }
       }
     }
   }

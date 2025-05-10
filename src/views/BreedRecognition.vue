@@ -99,8 +99,19 @@ export default {
     };
   },
   methods: {
+    checkLoginAndExecute(action) {
+      // 检查是否登录，未登录则提示
+      if (!this.$route.meta.isLoggedIn) {
+        this.$message.warning('请先登录后再进行操作')
+        return false
+      }
+      return action()
+    },
+    
     triggerFileInput() {
-      this.$refs.fileInput.click();
+      this.checkLoginAndExecute(() => {
+        this.$refs.fileInput.click();
+      })
     },
     
     handleFileSelect(event) {
@@ -111,11 +122,13 @@ export default {
     },
     
     handleDrop(event) {
-      this.isDragging = false;
-      const file = event.dataTransfer.files[0];
-      if (file && file.type.startsWith('image/')) {
-        this.processFile(file);
-      }
+      this.checkLoginAndExecute(() => {
+        this.isDragging = false;
+        const file = event.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+          this.processFile(file);
+        }
+      })
     },
     
     processFile(file) {
